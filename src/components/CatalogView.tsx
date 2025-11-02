@@ -4,10 +4,19 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSatelliteCatalog } from '@/hooks/useSatelliteCatalog';
 import { isApiKeyConfigured } from '@/lib/satellite-api';
 import { RefreshCw } from 'lucide-react';
+import { useEffect } from 'react';
+import { checkEnvironment } from '@/lib/env-check';
 
 const CatalogView = () => {
   const { satellites, loading, refresh } = useSatelliteCatalog();
   const apiKeyConfigured = isApiKeyConfigured();
+
+  // Debug: Check environment on mount
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      checkEnvironment();
+    }
+  }, []);
 
   return (
     <div className="w-full h-full overflow-auto p-4 md:p-6">

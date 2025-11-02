@@ -7,6 +7,15 @@ export default defineConfig({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      // Proxy N2YO API requests through Vite dev server to avoid CORS
+      '/api/n2yo': {
+        target: 'https://api.n2yo.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/n2yo/, '/rest/v1'),
+        secure: true,
+      }
+    }
   },
   plugins: [react()],
   resolve: {

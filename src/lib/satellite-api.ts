@@ -50,7 +50,17 @@ export interface SatelliteCatalogItem {
   satalt: number;
 }
 
-const API_BASE_URL = 'https://api.n2yo.com/rest/v1/satellite';
+// Use proxy in development, direct API in production
+const getApiBaseUrl = () => {
+  if (import.meta.env.DEV) {
+    // In development, use Vite proxy to avoid CORS
+    return '/api/n2yo/satellite';
+  }
+  // In production, use direct API (requires CORS support or backend proxy)
+  return 'https://api.n2yo.com/rest/v1/satellite';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Get API key from environment variable
