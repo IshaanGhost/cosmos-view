@@ -13,6 +13,8 @@ const TrackerView = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const [isMinimalView, setIsMinimalView] = useState(true);
   const [satelliteData, setSatelliteData] = useState({
     name: 'ISS (ZARYA)',
     latitude: 0,
@@ -79,12 +81,14 @@ const TrackerView = () => {
 
     mapRef.current = map;
 
-    // Add dark tile layer
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Add initial dark tile layer
+    const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 20
     }).addTo(map);
+    
+    tileLayerRef.current = tileLayer;
 
     // Create custom satellite icon
     const satelliteIcon = L.divIcon({
@@ -110,13 +114,54 @@ const TrackerView = () => {
       clearInterval(interval);
       map.remove();
       mapRef.current = null;
+      tileLayerRef.current = null;
     };
   }, []);
+
+  // Handle view toggle
+  useEffect(() => {
+    if (!mapRef.current || !tileLayerRef.current) return;
+
+    // Remove current tile layer
+    mapRef.current.removeLayer(tileLayerRef.current);
+
+    // Add new tile layer based on view mode
+    const newTileLayer = isMinimalView
+      ? L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 20
+        })
+      : L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+          maxZoom: 20
+        });
+
+    newTileLayer.addTo(mapRef.current);
+    tileLayerRef.current = newTileLayer;
+  }, [isMinimalView]);
 
   return (
     <div className="relative h-full">
       {/* Map Container */}
       <div ref={mapContainer} className="absolute inset-0 rounded-xl overflow-hidden" />
+      
+      {/* View Toggle Button */}
+      <div className="absolute top-4 right-4 z-[1000]">
+        <button
+          onClick={() => setIsMinimalView(!isMinimalView)}
+          className="bg-card/95 backdrop-blur-sm border border-border rounded-lg px-4 py-2 text-sm font-medium text-foreground hover:bg-card transition-colors shadow-lg flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {isMinimalView ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            )}
+          </svg>
+          {isMinimalView ? 'Satellite View' : 'Minimal View'}
+        </button>
+      </div>
       
       {/* Satellite Data Overlay */}
       <div className="absolute top-4 left-4 right-4 md:right-auto md:w-80 bg-card/95 backdrop-blur-sm border border-border rounded-xl p-6 shadow-[0_0_30px_rgba(6,182,212,0.2)]">
