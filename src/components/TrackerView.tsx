@@ -111,6 +111,7 @@ const TrackerView = () => {
   
   // Selected satellites (NORAD IDs)
   const [selectedSatellites, setSelectedSatellites] = useState<number[]>([25544]); // ISS by default
+  const selectedSatellitesRef = useRef<number[]>([25544]); // Keep a ref for closures
   
   // TLE loading states
   const [tleData, setTleData] = useState<Map<number, TLEData>>(new Map());
@@ -128,6 +129,11 @@ const TrackerView = () => {
   
   // Selected satellite for detailed view
   const [selectedSatelliteDetail, setSelectedSatelliteDetail] = useState<number>(25544);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedSatellitesRef.current = selectedSatellites;
+  }, [selectedSatellites]);
 
   // Fetch TLE data for selected satellites
   useEffect(() => {
@@ -223,7 +229,14 @@ const TrackerView = () => {
 
     if (!tleInfo.line1 || !tleInfo.line2) return;
 
-    const satrec = satellite.twoline2satrec(tleInfo.line1, tleInfo.line2);
+    let satrec: satellite.SatRec;
+    try {
+      satrec = satellite.twoline2satrec(tleInfo.line1, tleInfo.line2);
+    } catch (error) {
+      console.error(`Failed to parse TLE for satellite ${noradId}:`, error);
+      return;
+    }
+
     const now = new Date();
     const positionAndVelocity = satellite.propagate(satrec, now);
 
@@ -263,7 +276,17 @@ const TrackerView = () => {
           className: 'custom-satellite-icon',
           html: `<div class="flex items-center justify-center w-8 h-8 rounded-full shadow-[0_0_20px_${color}]" style="background-color: ${color};">
             <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2L4 7v10l8 5 8-5V7l-8-5zm0 2.18L17.82 7 12 10.82 6.18 7 12 4.18zM5 8.82l6 3.75v7.26l-6-3.75V8.82zm8 11.01v-7.26l6-3.75v7.26l-6 3.75z"/>
+              <!-- Main satellite body (bus) -->
+              <rect x="9" y="10" width="6" height="5" rx="0.5" fill="white"/>
+              <!-- Left solar panel -->
+              <rect x="5" y="11" width="3" height="3" rx="0.3" fill="white" opacity="0.85"/>
+              <!-- Right solar panel -->
+              <rect x="16" y="11" width="3" height="3" rx="0.3" fill="white" opacity="0.85"/>
+              <!-- Antenna dish on top -->
+              <ellipse cx="12" cy="8" rx="1.8" ry="1.2" fill="white"/>
+              <line x1="12" y1="9.2" x2="12" y2="10" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+              <!-- Small antenna on top of dish -->
+              <circle cx="12" cy="7" r="0.8" fill="white"/>
             </svg>
           </div>`,
           iconSize: [32, 32],
@@ -294,9 +317,11 @@ const TrackerView = () => {
         );
       }
 
-      // Update trajectories only every 30 seconds to reduce glitching
-      const lastUpdate = lastTrajectoryUpdateRef.current.get(noradId) || 0;
-      const shouldUpdateTrajectory = now.getTime() - lastUpdate > 30000; // 30 seconds
+      // Check if trajectory needs to be updated
+      // If no trajectory exists yet, or if 30 seconds have passed since last update
+      const lastUpdate = lastTrajectoryUpdateRef.current.get(noradId);
+      const hasTrajectory = pastTrajectoriesRef.current.has(noradId) || futureTrajectoriesRef.current.has(noradId);
+      const shouldUpdateTrajectory = !hasTrajectory || !lastUpdate || (now.getTime() - lastUpdate > 30000);
 
       if (shouldUpdateTrajectory) {
         // Show trajectory segments (5 minutes past and 5 minutes future)
@@ -315,7 +340,7 @@ const TrackerView = () => {
 
         // Draw new trajectories as single continuous polylines
         const colors = ['#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'];
-        const colorIndex = selectedSatellites.indexOf(noradId) % colors.length;
+        const colorIndex = selectedSatellitesRef.current.indexOf(noradId) % colors.length;
         const color = colors[colorIndex];
 
         if (pastPoints.length > 1 && mapRef.current) {
@@ -344,9 +369,9 @@ const TrackerView = () => {
     }
   };
 
-  // Update all selected satellites
+  // Update all selected satellites - use ref to get latest state
   const updateAllSatellites = () => {
-    selectedSatellites.forEach(noradId => {
+    selectedSatellitesRef.current.forEach(noradId => {
       updateSatellitePosition(noradId);
     });
   };
@@ -355,27 +380,42 @@ const TrackerView = () => {
   const toggleSatellite = (noradId: number) => {
     setSelectedSatellites(prev => {
       if (prev.includes(noradId)) {
+        // Don't allow removing the last satellite
+        if (prev.length === 1) {
+          return prev; // Keep at least one satellite selected
+        }
+        
         // Remove satellite
         const marker = markersRef.current.get(noradId);
         const pastTraj = pastTrajectoriesRef.current.get(noradId);
         const futureTraj = futureTrajectoriesRef.current.get(noradId);
         
-        if (marker && mapRef.current) mapRef.current.removeLayer(marker);
-        if (pastTraj && mapRef.current) mapRef.current.removeLayer(pastTraj);
-        if (futureTraj && mapRef.current) mapRef.current.removeLayer(futureTraj);
+        if (marker && mapRef.current) {
+          mapRef.current.removeLayer(marker);
+        }
+        if (pastTraj && mapRef.current) {
+          mapRef.current.removeLayer(pastTraj);
+        }
+        if (futureTraj && mapRef.current) {
+          mapRef.current.removeLayer(futureTraj);
+        }
         
         markersRef.current.delete(noradId);
         pastTrajectoriesRef.current.delete(noradId);
         futureTrajectoriesRef.current.delete(noradId);
         satelliteDataRef.current.delete(noradId);
+        lastTrajectoryUpdateRef.current.delete(noradId);
         
         // If removing the detail view satellite, switch to another
-        if (noradId === selectedSatelliteDetail && prev.length > 1) {
+        if (noradId === selectedSatelliteDetail) {
           const remaining = prev.filter(id => id !== noradId);
-          setSelectedSatelliteDetail(remaining[0]);
+          if (remaining.length > 0) {
+            setSelectedSatelliteDetail(remaining[0]);
+          }
         }
         
-        return prev.filter(id => id !== noradId);
+        const newSelected = prev.filter(id => id !== noradId);
+        return newSelected;
       } else {
         // Add satellite
         return [...prev, noradId];
@@ -412,7 +452,19 @@ const TrackerView = () => {
     updateAllSatellites();
     
     // Update positions every second (smooth tracking)
-    updateIntervalRef.current = setInterval(updateAllSatellites, 1000);
+    // Use ref to get latest selectedSatellites
+    updateIntervalRef.current = setInterval(() => {
+      // Clean up any markers that shouldn't be there
+      const currentSelected = selectedSatellitesRef.current;
+      markersRef.current.forEach((marker, id) => {
+        if (!currentSelected.includes(id) && mapRef.current) {
+          mapRef.current.removeLayer(marker);
+          markersRef.current.delete(id);
+        }
+      });
+      // Update only selected satellites
+      updateAllSatellites();
+    }, 1000);
 
     return () => {
       if (updateIntervalRef.current) {
@@ -442,9 +494,30 @@ const TrackerView = () => {
   // Update when selected satellites change
   useEffect(() => {
     if (!mapRef.current) return;
-    // Only update if satellites changed, not when TLE data updates
-    // TLE updates are handled by the interval
-    updateAllSatellites();
+    
+    // Remove any markers that are no longer selected
+    markersRef.current.forEach((marker, noradId) => {
+      if (!selectedSatellites.includes(noradId)) {
+        const pastTraj = pastTrajectoriesRef.current.get(noradId);
+        const futureTraj = futureTrajectoriesRef.current.get(noradId);
+        
+        if (marker && mapRef.current) mapRef.current.removeLayer(marker);
+        if (pastTraj && mapRef.current) mapRef.current.removeLayer(pastTraj);
+        if (futureTraj && mapRef.current) mapRef.current.removeLayer(futureTraj);
+        
+        markersRef.current.delete(noradId);
+        pastTrajectoriesRef.current.delete(noradId);
+        futureTrajectoriesRef.current.delete(noradId);
+        satelliteDataRef.current.delete(noradId);
+        lastTrajectoryUpdateRef.current.delete(noradId);
+      }
+    });
+    
+    // Update only selected satellites
+    selectedSatellites.forEach(noradId => {
+      updateSatellitePosition(noradId);
+    });
+    
     // Reset trajectory update times when satellites change
     lastTrajectoryUpdateRef.current.clear();
   }, [selectedSatellites]);
