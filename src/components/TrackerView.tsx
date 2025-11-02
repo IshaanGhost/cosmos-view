@@ -72,7 +72,9 @@ const TrackerView = () => {
       zoom: 2,
       zoomControl: true,
       minZoom: 2,
-      maxZoom: 10
+      maxZoom: 10,
+      maxBounds: [[-90, -180], [90, 180]],
+      maxBoundsViscosity: 1.0
     });
 
     mapRef.current = map;
