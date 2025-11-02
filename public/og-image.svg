@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="satelliteGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- Stars background -->
+  <circle cx="200" cy="150" r="2" fill="#06b6d4" opacity="0.6"/>
+  <circle cx="350" cy="100" r="1.5" fill="#06b6d4" opacity="0.5"/>
+  <circle cx="500" cy="180" r="1" fill="#06b6d4" opacity="0.4"/>
+  <circle cx="700" cy="120" r="2" fill="#06b6d4" opacity="0.6"/>
+  <circle cx="850" cy="200" r="1.5" fill="#06b6d4" opacity="0.5"/>
+  <circle cx="1000" cy="140" r="1" fill="#06b6d4" opacity="0.4"/>
+  
+  <!-- Earth outline -->
+  <circle cx="600" cy="400" r="180" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Satellite (left) -->
+  <g transform="translate(300, 250)">
+    <rect x="-20" y="-40" width="40" height="60" rx="4" fill="url(#satelliteGradient)" filter="url(#glow)"/>
+    <rect x="-35" y="-30" width="15" height="40" rx="2" fill="#06b6d4" opacity="0.8"/>
+    <rect x="20" y="-30" width="15" height="40" rx="2" fill="#06b6d4" opacity="0.8"/>
+    <line x1="0" y1="-40" x2="0" y2="-60" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="-60" r="4" fill="#06b6d4" filter="url(#glow)"/>
+  </g>
+  
+  <!-- Satellite (center) -->
+  <g transform="translate(600, 200)">
+    <rect x="-25" y="-50" width="50" height="70" rx="5" fill="url(#satelliteGradient)" filter="url(#glow)"/>
+    <rect x="-40" y="-35" width="20" height="50" rx="3" fill="#06b6d4" opacity="0.8"/>
+    <rect x="20" y="-35" width="20" height="50" rx="3" fill="#06b6d4" opacity="0.8"/>
+    <line x1="0" y1="-50" x2="0" y2="-75" stroke="#06b6d4" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="0" cy="-75" r="5" fill="#06b6d4" filter="url(#glow)"/>
+  </g>
+  
+  <!-- Title -->
+  <text x="600" y="120" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#06b6d4" text-anchor="middle" filter="url(#glow)">
+    🛰️ Satellite Tracker
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="540" font-family="Arial, sans-serif" font-size="32" fill="#8892b0" text-anchor="middle">
+    Real-Time Orbital Tracking &amp; Satellite Pass Calculator
+  </text>
+</svg>
+
