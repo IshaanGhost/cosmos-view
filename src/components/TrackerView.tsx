@@ -14,6 +14,8 @@ const TrackerView = () => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const pastTrajectoryRef = useRef<L.Polyline | null>(null);
+  const futureTrajectoryRef = useRef<L.Polyline | null>(null);
   const [isMinimalView, setIsMinimalView] = useState(true);
   const [satelliteData, setSatelliteData] = useState({
     name: 'ISS (ZARYA)',
@@ -22,6 +24,29 @@ const TrackerView = () => {
     altitude: 0,
     speed: 0
   });
+
+  // Calculate trajectory points
+  const calculateTrajectory = (satrec: satellite.SatRec, startTime: Date, minutes: number, step: number) => {
+    const points: [number, number][] = [];
+    const totalSteps = (minutes * 60) / step;
+
+    for (let i = 0; i <= totalSteps; i++) {
+      const time = new Date(startTime.getTime() + i * step * 1000);
+      const positionAndVelocity = satellite.propagate(satrec, time);
+
+      if (positionAndVelocity.position && typeof positionAndVelocity.position !== 'boolean') {
+        const positionEci = positionAndVelocity.position as satellite.EciVec3<number>;
+        const gmst = satellite.gstime(time);
+        const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+
+        const lat = satellite.degreesLat(positionGd.latitude);
+        const lon = satellite.degreesLong(positionGd.longitude);
+        points.push([lat, lon]);
+      }
+    }
+
+    return points;
+  };
 
   // Initialize satellite tracking
   const updateSatellitePosition = () => {
@@ -53,13 +78,54 @@ const TrackerView = () => {
         speed
       });
 
-      // Update marker position
+      // Update marker position and tooltip
       if (markerRef.current && mapRef.current) {
         markerRef.current.setLatLng([latitude, longitude]);
+        markerRef.current.setTooltipContent(
+          `<div class="text-sm font-semibold">${satelliteData.name}</div>
+           <div class="text-xs">Lat: ${latitude.toFixed(4)}°</div>
+           <div class="text-xs">Lon: ${longitude.toFixed(4)}°</div>`
+        );
         
         // Optional: pan to keep satellite in view
         if (!mapRef.current.getBounds().contains([latitude, longitude])) {
           mapRef.current.panTo([latitude, longitude], { animate: true });
+        }
+      }
+
+      // Update trajectories
+      if (mapRef.current) {
+        // Calculate past trajectory (last 30 minutes)
+        const pastPoints = calculateTrajectory(satrec, new Date(now.getTime() - 30 * 60 * 1000), 30, 60);
+        
+        // Calculate future trajectory (next 30 minutes)
+        const futurePoints = calculateTrajectory(satrec, now, 30, 60);
+
+        // Remove old trajectories
+        if (pastTrajectoryRef.current) {
+          mapRef.current.removeLayer(pastTrajectoryRef.current);
+        }
+        if (futureTrajectoryRef.current) {
+          mapRef.current.removeLayer(futureTrajectoryRef.current);
+        }
+
+        // Draw past trajectory (solid line)
+        if (pastPoints.length > 0) {
+          pastTrajectoryRef.current = L.polyline(pastPoints, {
+            color: '#06b6d4',
+            weight: 2,
+            opacity: 0.7
+          }).addTo(mapRef.current);
+        }
+
+        // Draw future trajectory (dotted line)
+        if (futurePoints.length > 0) {
+          futureTrajectoryRef.current = L.polyline(futurePoints, {
+            color: '#06b6d4',
+            weight: 2,
+            opacity: 0.5,
+            dashArray: '5, 10'
+          }).addTo(mapRef.current);
         }
       }
     }
@@ -102,8 +168,14 @@ const TrackerView = () => {
       iconAnchor: [16, 16]
     });
 
-    // Initialize marker
+    // Initialize marker with tooltip
     const marker = L.marker([0, 0], { icon: satelliteIcon }).addTo(map);
+    marker.bindTooltip('ISS (ZARYA)', {
+      permanent: false,
+      direction: 'top',
+      offset: [0, -16],
+      className: 'custom-tooltip'
+    });
     markerRef.current = marker;
 
     // Update position immediately and then every second
@@ -112,9 +184,13 @@ const TrackerView = () => {
 
     return () => {
       clearInterval(interval);
+      if (pastTrajectoryRef.current) map.removeLayer(pastTrajectoryRef.current);
+      if (futureTrajectoryRef.current) map.removeLayer(futureTrajectoryRef.current);
       map.remove();
       mapRef.current = null;
       tileLayerRef.current = null;
+      pastTrajectoryRef.current = null;
+      futureTrajectoryRef.current = null;
     };
   }, []);
 
