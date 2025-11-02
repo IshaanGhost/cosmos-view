@@ -160,6 +160,35 @@ export const parseTLE = (tleString: string): { line1: string; line2: string } | 
   return null;
 };
 
+export interface VisualPassInfo {
+  satname: string;
+  satid: number;
+  transactionscount: number;
+  passes: number;
+}
+
+export interface VisualPass {
+  startAz: number;
+  startAzCompass: string;
+  startEl: number;
+  startUTC: number;
+  maxAz: number;
+  maxAzCompass: string;
+  maxEl: number;
+  maxUTC: number;
+  endAz: number;
+  endAzCompass: string;
+  endEl: number;
+  endUTC: number;
+  mag: number;
+  duration: number;
+}
+
+export interface VisualPassesResponse {
+  info: VisualPassInfo;
+  passes: VisualPass[];
+}
+
 /**
  * Get visual passes (when satellite will be visible)
  * @param noradId NORAD catalog number
@@ -177,7 +206,7 @@ export const fetchVisualPasses = async (
   observerAlt: number = 0,
   days: number = 10,
   minVisibility: number = 1
-): Promise<any> => {
+): Promise<VisualPassesResponse | null> => {
   const apiKey = getApiKey();
   if (!apiKey) {
     return null;
@@ -189,10 +218,29 @@ export const fetchVisualPasses = async (
     );
 
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      // Try to get more detailed error info
+      let errorMessage = `API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
+      throw new Error(errorMessage);
     }
 
-    const data = await response.json();
+    const data: VisualPassesResponse = await response.json();
+    
+    // Check if the API returned an error in the response body
+    if (data.info && data.info.transactionscount === undefined) {
+      // Sometimes the API returns success but with error info
+      console.warn(`API returned unexpected format for satellite ${noradId}:`, data);
+    }
+    
     return data;
   } catch (error) {
     console.error(`Error fetching visual passes for satellite ${noradId}:`, error);
